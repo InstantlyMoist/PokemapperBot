@@ -1,19 +1,25 @@
-const message = require("../events/message");
-
 function getDataString(client, message) {
     let finalString = "";
     for (data in client.userdata[message.author.id]) finalString += `${data.charAt(0).toUpperCase() + data.slice(1)}: ${client.userdata[message.author.id][data]}\n`;
     return finalString;
 }
 
-exports.run = (client, message, args) => {
+exports.run = async (client, message, args) => {
     let foundCity = client.userdata[message.author.id].city;
     if (foundCity == null) {
         message.channel.send("Jouw data is nog niet bekend, graag eventjes invullen in je prive chat, zie je niks? typ +setup");
         return;
     }
     if (foundCity == "breda") {
-        message.channel.send("We hebben je een privebericht gestuurd. Hierin staan je gegevens die je nogmaals moet controleren");
+        let sentEmbed = {
+            color: 0x0099ff,
+            title: 'We hebben je een privebericht gestuurd',
+            description: `${message.author.toString()}, om zeker te weten dat alle gegevens kloppen sturen we je een privebericht. Hierin staan je gegevens nog een keer.`
+        }
+        message.channel.send({ embed : sentEmbed }).then((msg) => {
+            msg.delete({timeout: 5000});
+            message.delete({timeout: 5000});
+        });
         let informationEmbed = {
             color: 0x0099ff,
             title: 'Controleer je gegevens!',
@@ -25,31 +31,64 @@ exports.run = (client, message, args) => {
                 }
             ]
         }
-        message.author.send({ embed: informationEmbed});
-        /*let invoice_json = createInvoice(client, message);
-        client.paypal.invoice.create(invoice_json, function (error, invoice) {
-            if (error) {
-                message.channel.send("Fout tijdens maken van factuur!");
-                console.log(error.response.details)
-            } else {
-                client.paypal.invoice.send(invoice.id, function (error, rv) {
-                    if (error) {
-                        message.channel.send("Factuur niet verzonden!");
-                        console.log(error.response);
-                        throw error;
+        message.author.send({ embed: informationEmbed }).then(async (message) => {
+            await message.react('✅');
+            await message.react('❎');
+            let foundUser;
+            message.awaitReactions((reaction, user) => {
+                foundUser = user;
+                return reaction.message.id == message.id
+            }, { max: 1 })
+                .then(async (collected) => {
+                    const foundEmoji = collected.first();
+                    if (foundEmoji.emoji.name == "✅") {
+                        let sendingEmbed = {
+                            color: 0x0099ff,
+                            title: 'We versturen de factuur...',
+                            description: 'Een klein ogenblikje, dan versturen we de factuur...'
+                        }
+                        let errorEmbed = {
+                            color: 0x0099ff,
+                            title: '❎ Factuur maken mislukt',
+                            description: 'Er is iets fout gegaan tijdens het maken van de factuur, raadpleeg een administrator in de server.'
+                        }
+                        let okEmbed = {
+                            color: 0x0099ff,
+                            title: '✅ Factuur maken gelukt',
+                            description: 'Je ontvangt de factuur zo spoedig mogelijk in je mail!'
+                        }
+                        sendingMessage = await message.channel.send({ embed: sendingEmbed });
+                        let invoice_json = createInvoice(client, foundUser);
+                        client.paypal.invoice.create(invoice_json, function (error, invoice) {
+                            if (error) {
+                                sendingMessage.edit({ embed : errorEmbed});
+                                console.log(error.response.details)
+                            } else {
+                                client.paypal.invoice.send(invoice.id, function (error, rv) {
+                                    if (error) {
+                                        sendingMessage.edit({ embed : errorEmbed});
+                                        console.log(error.response);
+                                        throw error;
+                                    } else {
+                                        sendingMessage.edit({ embed : okEmbed});
+                                    }
+                                });
+                            }
+                        });
                     } else {
-                        message.channel.send("Factuur succesvol verzonden!");
+                        message.channel.send("Pas aan dan ei");
                     }
-                });
-            }
-        });*/
+                })
+                .catch((err) => console.error(err));
+        });
+        /**/
     } else {
         message.channel.send("Het +pay commando werkt niet in andere steden dan breda...");
     }
     console.log(foundCity);
 }
 
-function createInvoice(client, message) {
+function createInvoice(client, foundUser) {
     return invoice = {
         "merchant_info": {
             "email": "kyllian007@gmail.com",
@@ -58,7 +97,7 @@ function createInvoice(client, message) {
             "business_name": "Pokemon GO Breda",
         },
         "billing_info": [{
-            "email": client.userdata[message.author.id].email,
+            "email": client.userdata[foundUser.id].email,
         }],
         "items": [{
             "name": "Pokemon GO Map",
@@ -72,7 +111,7 @@ function createInvoice(client, message) {
         "payment_term": {
             "term_type": "NET_45"
         },
-    
+
         "tax_inclusive": false,
         "total_amount": {
             "currency": "EUR",
