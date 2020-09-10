@@ -1,0 +1,18 @@
+{
+    "breda": {
+        "roleID": "753546483168706571",
+        "needsEmail": true,
+        "needsRegion": true,
+        "regions": [
+            "Haagse Beemden",
+            "Hoge Vucht",
+            "Terheijden"
+        ]
+    },
+    "oosterhout": {
+        "roleID": "753546552357945454",
+        "needsEmail": false,
+        "needsRegion": false,
+        "regions": []
+    }
+}
